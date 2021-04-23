@@ -39,7 +39,7 @@ macro_rules! serial_port {
     }};
 }
 
-/// Create a [Uart](hal::uart::Uart) client with the default pins
+/// Create a [Uarte](hal::uart::Uarte) client with the default pins
 #[macro_export]
 #[cfg(feature = "v2")]
 macro_rules! serial_port {
