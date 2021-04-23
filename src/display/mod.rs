@@ -177,8 +177,6 @@ pub use timer::MicrobitDisplayTimer;
 
 use crate::{gpio::DisplayPins, hal::timer::Instance};
 
-use control::MicrobitGpio;
-
 /// Initialises the micro:bit hardware to use the display driver.
 ///
 /// Assumes the GPIO port is in the state it would have after system reset.
@@ -192,9 +190,9 @@ use control::MicrobitGpio;
 /// ```
 pub fn initialise_display<T: Instance>(
     timer: &mut MicrobitDisplayTimer<T>,
-    _pins: &mut DisplayPins,
+    pins: &mut DisplayPins,
 ) {
-    tiny_led_matrix::initialise_control(&mut MicrobitGpio {});
+    tiny_led_matrix::initialise_control(pins);
     tiny_led_matrix::initialise_timer(timer);
 }
 
@@ -227,7 +225,9 @@ pub fn initialise_display<T: Instance>(
 pub fn handle_display_event<T: Instance>(
     display: &mut Display<MicrobitFrame>,
     timer: &mut MicrobitDisplayTimer<T>,
-    _pins: &mut DisplayPins,
+    pins: &mut DisplayPins,
 ) {
-    display.handle_event(timer, &mut MicrobitGpio {});
+    display.handle_event(timer, pins);
 }
+
+pub(crate) use control::{MATRIX_COLS, MATRIX_ROWS};

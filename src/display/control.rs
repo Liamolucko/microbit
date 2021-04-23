@@ -4,43 +4,19 @@
 //!
 //! [`DisplayControl`]: tiny_led_matrix::DisplayControl
 
-use crate::pac;
+use crate::gpio::DisplayPins;
+use nrf52833_hal::prelude::*;
 use tiny_led_matrix::DisplayControl;
 
-const fn pin_bits(pins: &[usize]) -> u32 {
-    let mut i: usize = 0;
-    let mut bits: u32 = 0;
-    while i < pins.len() {
-        bits |= 1 << pins[i];
-        i += 1;
-    }
-    bits
-}
-
+#[cfg(feature = "v1")]
 pub(crate) const MATRIX_COLS: usize = 9;
-const COLS: [usize; MATRIX_COLS] = [4, 5, 6, 7, 8, 9, 10, 11, 12];
-const COL_BITS: u32 = pin_bits(&COLS);
+#[cfg(feature = "v2")]
+pub(crate) const MATRIX_COLS: usize = 5;
 
+#[cfg(feature = "v1")]
 pub(crate) const MATRIX_ROWS: usize = 3;
-const ROWS: [usize; MATRIX_ROWS] = [13, 14, 15];
-const ROW_BITS: u32 = pin_bits(&ROWS);
-
-/// Wrapper for `nrf51::GPIO` for passing to the display code.
-///
-/// This implements the `DisplayControl` trait.
-///
-/// [`DisplayControl`]: tiny_led_matrix::DisplayControl
-pub(crate) struct MicrobitGpio;
-
-/// Returns the GPIO pin numbers corresponding to the columns in a Columnt et.
-fn column_pins(mut cols: u32) -> u32 {
-    let mut result = 0u32;
-    for pin in COLS.iter() {
-        result |= (cols & 1) << pin;
-        cols >>= 1;
-    }
-    result
-}
+#[cfg(feature = "v2")]
+pub(crate) const MATRIX_ROWS: usize = 5;
 
 /// Implementation of [`DisplayControl`] for the micro:bit's GPIO peripheral.
 ///
@@ -50,42 +26,138 @@ fn column_pins(mut cols: u32) -> u32 {
 /// state it would have after system reset.
 ///
 /// [`DisplayControl`]: tiny_led_matrix::DisplayControl
-impl DisplayControl for MicrobitGpio {
+impl DisplayControl for DisplayPins {
     fn initialise_for_display(&mut self) {
-        unsafe {
-            let gpio = &*pac::GPIO::ptr();
-            for ii in COLS.iter() {
-                gpio.pin_cnf[*ii].write(|w| w.dir().output());
-            }
-            for ii in ROWS.iter() {
-                gpio.pin_cnf[*ii].write(|w| w.dir().output());
-            }
-
-            // Set all cols high.
-            gpio.outset
-                .write(|w| w.bits(COLS.iter().map(|pin| 1 << pin).sum()));
+        // Set all cols high.
+        // nrf-hal GPIO pins are infallible
+        self.col1.set_high().unwrap();
+        self.col2.set_high().unwrap();
+        self.col3.set_high().unwrap();
+        self.col4.set_high().unwrap();
+        self.col5.set_high().unwrap();
+        #[cfg(feature = "v1")]
+        {
+            self.col6.set_high().unwrap();
+            self.col7.set_high().unwrap();
+            self.col8.set_high().unwrap();
+            self.col9.set_high().unwrap();
         }
     }
 
     fn display_row_leds(&mut self, row: usize, cols: u32) {
-        unsafe {
-            let gpio = &*pac::GPIO::ptr();
-            // To light an LED, we set the row bit and clear the col bit.
-            let rows_to_set = 1 << ROWS[row];
-            let rows_to_clear = ROW_BITS ^ rows_to_set;
+        // To light an LED, we set the row bit and clear the col bit.
 
-            let cols_to_clear = column_pins(cols);
-            let cols_to_set = COL_BITS ^ cols_to_clear;
+        // Clear all rows
+        self.row1.set_low().unwrap();
+        self.row2.set_low().unwrap();
+        self.row3.set_low().unwrap();
+        #[cfg(feature = "v2")]
+        {
+            self.row4.set_low().unwrap();
+            self.row5.set_low().unwrap();
+        }
 
-            gpio.outset.write(|w| w.bits(rows_to_set | cols_to_set));
-            gpio.outclr.write(|w| w.bits(rows_to_clear | cols_to_clear));
+        // Set/clear columns
+        if cols & 0b000000001 != 0 {
+            self.col1.set_low().unwrap();
+        } else {
+            self.col1.set_high().unwrap();
+        }
+        if cols & 0b000000010 != 0 {
+            self.col2.set_low().unwrap();
+        } else {
+            self.col2.set_high().unwrap();
+        }
+        if cols & 0b000000100 != 0 {
+            self.col3.set_low().unwrap();
+        } else {
+            self.col3.set_high().unwrap();
+        }
+        if cols & 0b000001000 != 0 {
+            self.col4.set_low().unwrap();
+        } else {
+            self.col4.set_high().unwrap();
+        }
+        if cols & 0b000010000 != 0 {
+            self.col5.set_low().unwrap();
+        } else {
+            self.col5.set_high().unwrap();
+        }
+        #[cfg(feature = "v1")]
+        {
+            if cols & 0b000100000 != 0 {
+                self.col6.set_low().unwrap();
+            } else {
+                self.col6.set_high().unwrap();
+            }
+            if cols & 0b001000000 != 0 {
+                self.col7.set_low().unwrap();
+            } else {
+                self.col7.set_high().unwrap();
+            }
+            if cols & 0b010000000 != 0 {
+                self.col8.set_low().unwrap();
+            } else {
+                self.col8.set_high().unwrap();
+            }
+            if cols & 0b100000000 != 0 {
+                self.col9.set_low().unwrap();
+            } else {
+                self.col9.set_high().unwrap();
+            }
+        }
+
+        // Set current row
+        if row == 0 {
+            self.row1.set_high().unwrap();
+        }
+        if row == 1 {
+            self.row2.set_high().unwrap();
+        }
+        if row == 2 {
+            self.row3.set_high().unwrap();
+        }
+        #[cfg(feature = "v2")]
+        {
+            if row == 3 {
+                self.row4.set_high().unwrap();
+            }
+            if row == 4 {
+                self.row5.set_high().unwrap();
+            }
         }
     }
 
     fn light_current_row_leds(&mut self, cols: u32) {
-        unsafe {
-            let gpio = &*crate::pac::GPIO::ptr();
-            gpio.outclr.write(|w| w.bits(column_pins(cols)));
+        if cols & 0b000000001 != 0 {
+            self.col1.set_low().unwrap();
+        }
+        if cols & 0b000000010 != 0 {
+            self.col2.set_low().unwrap();
+        }
+        if cols & 0b000000100 != 0 {
+            self.col3.set_low().unwrap();
+        }
+        if cols & 0b000001000 != 0 {
+            self.col4.set_low().unwrap();
+        }
+        if cols & 0b000010000 != 0 {
+            self.col5.set_low().unwrap();
+        }
+        #[cfg(feature = "v1")]
+        {
+            if cols & 0b000100000 != 0 {
+                self.col6.set_low().unwrap();
+            }
+            if cols & 0b001000000 != 0 {
+                self.col7.set_low().unwrap();
+            }
+            if cols & 0b010000000 != 0 {
+                self.col8.set_low().unwrap();
+            }
+            if cols & 0b100000000 != 0 {
+                self.col9.set_low().unwrap();
+            }
         }
     }
 }

@@ -16,7 +16,8 @@ pub struct MicrobitMatrix();
 
 /// Gives the LED (x, y) coordinates for a given pin row and column.
 /// The origin is in the top-left.
-const MICROBIT_LED_LAYOUT: [[Option<(usize, usize)>; 3]; 9] = [
+/// Not needed for the v2, since logical coordinates map directly to pin coordinates.
+const V1_LED_LAYOUT: [[Option<(usize, usize)>; 3]; 9] = [
     [Some((0, 0)), Some((4, 2)), Some((2, 4))],
     [Some((2, 0)), Some((0, 2)), Some((4, 4))],
     [Some((4, 0)), Some((2, 2)), Some((0, 4))],
@@ -39,7 +40,11 @@ impl Matrix for MicrobitMatrix {
     const IMAGE_ROWS: usize = 5;
 
     fn image_coordinates(col: usize, row: usize) -> Option<(usize, usize)> {
-        MICROBIT_LED_LAYOUT[col][row]
+        if cfg!(feature = "v1") {
+            V1_LED_LAYOUT[col][row]
+        } else {
+            Some((col, row))
+        }
     }
 }
 

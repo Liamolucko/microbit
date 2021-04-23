@@ -37,6 +37,9 @@
 //! ```
 //!
 //! See a working example at `examples/led_blocking.rs`
+use crate::display;
+use crate::display::MATRIX_COLS;
+use crate::display::MATRIX_ROWS;
 use crate::hal::{
     gpio::{Output, Pin, PushPull},
     prelude::*,
@@ -50,6 +53,7 @@ use embedded_hal::blocking::delay::DelayUs;
 pub(crate) type LED = Pin<Output<PushPull>>;
 
 const DEFAULT_DELAY_MS: u32 = 2;
+#[cfg(feature = "v1")]
 const LED_LAYOUT: [[(usize, usize); 5]; 5] = [
     [(0, 0), (1, 3), (0, 1), (1, 4), (0, 2)],
     [(2, 3), (2, 4), (2, 5), (2, 6), (2, 7)],
@@ -61,9 +65,11 @@ const LED_LAYOUT: [[(usize, usize); 5]; 5] = [
 /// Blocking interface to the on board LED display
 pub struct Display {
     delay_ms: u32,
-    rows: [LED; 3],
-    cols: [LED; 9],
+    rows: [LED; display::MATRIX_ROWS],
+    cols: [LED; display::MATRIX_COLS],
 }
+
+type Matrix = [[u8; MATRIX_COLS]; MATRIX_ROWS];
 
 impl Display {
     /// Initialise display
@@ -77,6 +83,10 @@ impl Display {
                 pins.row1.degrade(),
                 pins.row2.degrade(),
                 pins.row3.degrade(),
+                #[cfg(feature = "v2")]
+                pins.row4.degrade(),
+                #[cfg(feature = "v2")]
+                pins.row5.degrade(),
             ],
             cols: [
                 pins.col1.degrade(),
@@ -84,9 +94,13 @@ impl Display {
                 pins.col3.degrade(),
                 pins.col4.degrade(),
                 pins.col5.degrade(),
+                #[cfg(feature = "v1")]
                 pins.col6.degrade(),
+                #[cfg(feature = "v1")]
                 pins.col7.degrade(),
+                #[cfg(feature = "v1")]
                 pins.col8.degrade(),
+                #[cfg(feature = "v1")]
                 pins.col9.degrade(),
             ],
         };
@@ -116,14 +130,19 @@ impl Display {
     }
 
     /// Convert 5x5 display image to 3x9 matrix image
-    pub fn display2matrix(led_display: [[u8; 5]; 5]) -> [[u8; 9]; 3] {
-        let mut led_matrix: [[u8; 9]; 3] = [[0; 9]; 3];
-        for (led_display_row, layout_row) in led_display.iter().zip(LED_LAYOUT.iter()) {
-            for (led_display_val, layout_loc) in led_display_row.iter().zip(layout_row) {
-                led_matrix[layout_loc.0][layout_loc.1] = *led_display_val;
+    pub fn display2matrix(led_display: [[u8; 5]; 5]) -> Matrix {
+        #[cfg(feature = "v2")]
+        return led_display;
+        #[cfg(feature = "v1")]
+        {
+            let mut led_matrix: Matrix = [[0; MATRIX_COLS]; MATRIX_ROWS];
+            for (led_display_row, layout_row) in led_display.iter().zip(LED_LAYOUT.iter()) {
+                for (led_display_val, layout_loc) in led_display_row.iter().zip(layout_row) {
+                    led_matrix[layout_loc.0][layout_loc.1] = *led_display_val;
+                }
             }
+            led_matrix
         }
-        led_matrix
     }
 
     /// Display 5x5 display image for a given duration
@@ -141,7 +160,7 @@ impl Display {
     pub fn display_pre<D: DelayUs<u32>>(
         &mut self,
         delay: &mut D,
-        led_matrix: [[u8; 9]; 3],
+        led_matrix: Matrix,
         duration_ms: u32,
     ) {
         // TODO: something more intelligent with timers
